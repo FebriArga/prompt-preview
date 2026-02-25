@@ -213,7 +213,7 @@ button.danger {
 
 .node-list-row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto auto;
   align-items: center;
   gap: 6px;
 }
@@ -241,6 +241,19 @@ button.danger {
   height: 24px;
   padding: 0;
   font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.node-list-level {
+  border: 1px solid rgba(16, 19, 26, 0.2);
+  background: #f5f7fb;
+  color: #1f2937;
+  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
 }

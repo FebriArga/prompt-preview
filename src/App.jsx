@@ -21,11 +21,65 @@ const TEMPLATE_NODES = [
   { role: "condition", label: "Condition", hint: "Branching rule for next step" }
 ];
 
-const formatNumberedList = (items = []) =>
-  items
-    .map((item, index) => `${index + 1}. ${item?.trim() ?? ""}`.trimEnd())
-    .filter((line) => line !== `${line.split(".")[0]}.`)
+const createListItem = (text = "", level = 1) => ({
+  id: `li-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  text,
+  level: Math.max(1, Math.min(3, Number(level) || 1))
+});
+
+const normalizeListItems = (items = [], fallbackContent = "") => {
+  if (Array.isArray(items) && items.length) {
+    return items.map((item) => {
+      if (typeof item === "string") {
+        return createListItem(item, 1);
+      }
+      return {
+        id: item?.id || createListItem().id,
+        text: item?.text ?? "",
+        level: Math.max(1, Math.min(3, Number(item?.level) || 1))
+      };
+    });
+  }
+
+  const lines = (fallbackContent || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length) {
+    return lines.map((line) => {
+      const match = line.match(/^(\d+(?:\.\d+)*)(?:\.)?\s+(.+)$/);
+      if (match) {
+        return createListItem(match[2], match[1].split(".").length);
+      }
+      return createListItem(line, 1);
+    });
+  }
+
+  return [createListItem("", 1)];
+};
+
+const formatNumberedList = (items = []) => {
+  const normalized = normalizeListItems(items);
+  const counters = [0, 0, 0];
+
+  return normalized
+    .map((item) => {
+      const level = Math.max(1, Math.min(3, item.level));
+      counters[level - 1] += 1;
+      for (let index = level; index < counters.length; index += 1) {
+        counters[index] = 0;
+      }
+      const token = counters.slice(0, level).join(".");
+      const text = (item.text ?? "").trim();
+      if (!text) {
+        return "";
+      }
+      return `${token} ${text}`;
+    })
+    .filter(Boolean)
     .join("\n");
+};
 
 const initialNodes = [
   {
@@ -35,8 +89,11 @@ const initialNodes = [
     data: {
       role: "system",
       label: "System",
-      listItems: ["You are a careful assistant.", "Always provide structured output."],
-      content: "1. You are a careful assistant.\n2. Always provide structured output."
+      listItems: [
+        createListItem("You are a careful assistant.", 1),
+        createListItem("Always provide structured output.", 1)
+      ],
+      content: "1 You are a careful assistant.\n2 Always provide structured output."
     }
   },
   {
@@ -46,8 +103,11 @@ const initialNodes = [
     data: {
       role: "user",
       label: "User",
-      listItems: ["Summarize the latest ticket updates.", "Suggest next actions."],
-      content: "1. Summarize the latest ticket updates.\n2. Suggest next actions."
+      listItems: [
+        createListItem("Summarize the latest ticket updates.", 1),
+        createListItem("Suggest next actions.", 1)
+      ],
+      content: "1 Summarize the latest ticket updates.\n2 Suggest next actions."
     }
   }
 ];
@@ -460,10 +520,7 @@ function layoutGraph(graph) {
     const ids = grouped.get(l);
     ids.forEach((id, lane) => {
       const node = nodesById.get(id);
-      const listItems = node.content
-        .split("\n")
-        .map((line) => line.replace(/^\d+\.\s*/, "").trim())
-        .filter(Boolean);
+      const listItems = normalizeListItems([], node.content);
       rfNodes.push({
         id: node.id,
         type: "promptNode",
@@ -472,7 +529,7 @@ function layoutGraph(graph) {
           role: node.role,
           label: node.label,
           content: node.content,
-          listItems: listItems.length ? listItems : [node.content]
+          listItems
         }
       });
     });
@@ -718,7 +775,7 @@ function FlowDesigner() {
 
   const updateNodeList = useCallback(
     (nodeId, listItems) => {
-      const safeItems = listItems.map((item) => item ?? "");
+      const safeItems = normalizeListItems(listItems);
       updateNodeData(nodeId, {
         listItems: safeItems,
         content: formatNumberedList(safeItems)
@@ -777,7 +834,7 @@ function FlowDesigner() {
           data: {
             role: template.role,
             label: template.label,
-            listItems: [""],
+            listItems: [createListItem("", 1)],
             content: ""
           }
         }
